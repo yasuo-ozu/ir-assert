@@ -1,0 +1,22 @@
+[package]
+name = "ir-assert-macro"
+description = "in-test assertion over its compiled llvm-ir"
+version = "0.1.0"
+authors = ["Yasuo Ozu <yasuo@ozu.email>"]
+edition = "2021"
+repository = "https://github.com/yasuo-ozu/ir-assert"
+keywords = ["macros", "zerocost", "debugging", "testing", "llvm", "llvm-ir"]
+categories = ["development-tools::debugging", "development-tools::testing"]
+license = "MIT"
+
+[lib]
+proc-macro = true
+path = "lib.rs"
+
+[dependencies]
+proc-macro2 = "1.0"
+template-quote = "0.4"
+
+[dependencies.syn]
+version = "2.0"
+features = ["full", "derive", "printing", "extra-traits"]

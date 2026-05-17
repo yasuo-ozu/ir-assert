@@ -1,0 +1,24 @@
+[package]
+name = "ir-assert"
+description = "in-test assertion over its compiled llvm-ir"
+version = "0.1.0"
+authors = ["Yasuo Ozu <yasuo@ozu.email>"]
+edition = "2021"
+rust-version = "1.71"
+repository = "https://github.com/yasuo-ozu/ir-assert"
+keywords = ["macros", "zerocost", "debugging", "testing", "llvm", "llvm-ir"]
+categories = ["development-tools::debugging", "development-tools::testing"]
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+ir-assert-macro = { path = "macro", version = "0.1.0" }
+
+[dev-dependencies]
+trybuild = "=1.0.85"
+
+[workspace]
+members = [".", "macro"]
+resolver = "2"

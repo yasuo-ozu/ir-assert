@@ -1,0 +1,10 @@
+error[E0282]: type annotations needed
+ --> tests/ui/generic_fn_missing_type_params.rs:8:42
+  |
+8 |     assert_ir!(basic_blocks.len().ge(1), id);
+  |                                          ^^ cannot infer type of the type parameter `T` declared on the function `id`
+  |
+help: consider specifying the generic argument
+  |
+8 |     assert_ir!(basic_blocks.len().ge(1), id::<T>);
+  |                                            +++++

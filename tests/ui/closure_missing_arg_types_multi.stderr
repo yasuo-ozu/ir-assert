@@ -1,0 +1,11 @@
+error[E0284]: type annotations needed
+ --> tests/ui/closure_missing_arg_types_multi.rs:4:43
+  |
+4 |     assert_ir!(basic_blocks.len().ge(1), |a, b| a + b);
+  |                                           ^       - type must be known at this point
+  |
+  = note: cannot satisfy `<_ as Add<_>>::Output == _`
+help: consider giving this closure parameter an explicit type
+  |
+4 |     assert_ir!(basic_blocks.len().ge(1), |a: /* Type */, b| a + b);
+  |                                            ++++++++++++
