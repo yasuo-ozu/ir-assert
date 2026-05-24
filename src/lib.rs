@@ -10,6 +10,7 @@ use env::EnvSpec;
 pub use ir::{BasicBlockIr, FunctionIr};
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::path::PathBuf;
 
 #[doc(hidden)]
 pub use ir_assert_macro::__assert_ir_impl;
@@ -110,14 +111,12 @@ pub fn __macro_internal(
     pred_str: &str,
     target_names: &[&str],
 ) {
-    let exe_path =
-        std::env::current_exe().unwrap_or_else(|e| panic!("Cannot obtain exe path: {}", e));
-    let ir_target_dir = exe_path
-        .parent()
-        .and_then(|p| p.parent())
-        .and_then(|p| p.parent())
-        .unwrap()
-        .join("ir-assert");
+    // Prefer Cargo's configured target dir to keep outputs in a writable/project-local location.
+    // This also avoids deriving `/ir-assert...` when invoked from doctests.
+    let cargo_target_dir = std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(manifest_dir).join("target"));
+    let ir_target_dir = cargo_target_dir.join("ir-assert");
 
     // Synchronize: only one thread builds the IR file at a time
     let _lock = build::BUILD_LOCK.lock().unwrap_or_else(|e| e.into_inner());

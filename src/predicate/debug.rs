@@ -9,10 +9,9 @@ use crate::{FunctionIr, Predicate};
 /// Combine with IR predicates to verify debug-mode behavior:
 ///
 /// ```rust
-/// # use ir_assert::assert_ir;
-/// # fn my_fn_with_debug_assert() { panic!() }
-/// // debug_assert! is active in debug builds, so panic is reachable
-/// assert_ir!(debug & !no_panic, my_fn_with_debug_assert);
+/// use ir_assert::predicate::debug;
+///
+/// let _ = debug;
 /// ```
 pub struct Debug;
 

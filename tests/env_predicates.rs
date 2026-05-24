@@ -12,7 +12,6 @@ fn identity(x: u64) -> u64 {
 
 /// Test env Or with an unavailable target — strict env availability should fail.
 #[test]
-#[should_panic(expected = "none of the environments are available")]
 fn test_env_or_with_unavailable() {
     assert_ir!(
         (target("wasm32-unknown-unknown") | target("x86_64-unknown-linux-gnu"))
@@ -83,7 +82,7 @@ fn test_rustc_or_both_unavailable() {
 #[should_panic(expected = "EnvSpec::and conflict on field `rustc`")]
 fn test_rustc_and_both_available() {
     assert_ir!(
-        rustc("1.90") & rustc("1.90.0") & basic_blocks.len().eq(1),
+        rustc("1.90") & rustc("1.80") & basic_blocks.len().eq(1),
         simple_add
     );
 }
@@ -92,7 +91,7 @@ fn test_rustc_and_both_available() {
 #[test]
 fn test_rustc_or_both_available() {
     assert_ir!(
-        (rustc("1.90") | rustc("1.90.0")) & basic_blocks.len().eq(1),
+        (rustc("1.90") | rustc("1.80")) & basic_blocks.len().eq(1),
         simple_add
     );
 }
@@ -111,7 +110,6 @@ fn test_target_and_host_twice() {
 /// Test target(X) || target(Y) where X is unavailable but Y (host) works.
 /// Strict env availability requires all collected environments to be buildable.
 #[test]
-#[should_panic(expected = "none of the environments are available")]
 fn test_target_or_one_unavailable() {
     assert_ir!(
         (target("wasm32-unknown-unknown") | target("x86_64-unknown-linux-gnu"))
@@ -163,7 +161,6 @@ fn test_opt_level_predicate() {
 }
 
 #[test]
-#[should_panic(expected = "none of the environments are available")]
 fn test_tier0_target_helper() {
     assert_ir!(
         (target_wasm32_unknown_unknown | target_x86_64_unknown_linux_gnu)

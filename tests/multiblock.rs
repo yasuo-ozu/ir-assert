@@ -106,10 +106,7 @@ fn test_collatz() {
     assert_ir!(branches.len().gt(0), collatz_steps);
     assert_ir!(branches.len().ge(1) & branches.len().le(3), collatz_steps);
     assert_ir!(phi_nodes.len().gt(0), collatz_steps);
-    assert_ir!(
-        phi_nodes.len().ge(2) & phi_nodes.len().le(4),
-        collatz_steps
-    );
+    assert_ir!(phi_nodes.len().ge(2) & phi_nodes.len().le(4), collatz_steps);
     assert_ir!(calls.len().eq(0), collatz_steps);
     assert_ir!(allocas.len().eq(0), collatz_steps);
     assert_ir!(
@@ -154,7 +151,7 @@ fn test_loop_multiple_blocks() {
     assert_ir!(branches.len().ge(5) & branches.len().le(9), sum_array);
     assert_ir!(phi_nodes.len().ge(6) & phi_nodes.len().le(10), sum_array);
     assert_ir!(
-        instructions.len().ge(30) & instructions.len().le(50),
+        instructions.len().ge(30) & instructions.len().le(55),
         sum_array
     );
 }

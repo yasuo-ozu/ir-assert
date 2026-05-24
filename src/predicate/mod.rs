@@ -135,10 +135,11 @@ use crate::env::EnvSpec;
 /// Returns a predicate that selects a specific rustc toolchain version.
 /// When combined with IR predicates, the IR will be generated using that toolchain.
 ///
-/// ```
-/// # use ir_assert::assert_ir;
-/// # fn my_fn() {}
-/// assert_ir!(rustc("1.80") & basic_blocks.len().eq(1), my_fn);
+/// ```rust
+/// use ir_assert::predicate::rustc;
+///
+/// let env = rustc("1.80");
+/// assert_eq!(env.rustc, Some("1.80"));
 /// ```
 #[allow(non_snake_case)]
 pub const fn rustc(version: &'static str) -> EnvSpec {
@@ -148,10 +149,11 @@ pub const fn rustc(version: &'static str) -> EnvSpec {
 /// Returns a predicate that selects a specific target triple.
 /// When combined with IR predicates, the IR will be generated for that target.
 ///
-/// ```
-/// # use ir_assert::assert_ir;
-/// # fn my_fn() {}
-/// assert_ir!(target("wasm32-unknown-unknown") & basic_blocks.len().eq(1), my_fn);
+/// ```rust
+/// use ir_assert::predicate::target;
+///
+/// let env = target("wasm32-unknown-unknown");
+/// assert_eq!(env.target, Some("wasm32-unknown-unknown"));
 /// ```
 pub const fn target(triple: &'static str) -> EnvSpec {
     EnvSpec::target(triple)

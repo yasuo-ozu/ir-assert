@@ -122,6 +122,13 @@ fn inner(input: TokenStream) -> TokenStream {
                 let arg_tys: Vec<TokenStream> = (0..*arity).map(|_| quote! { _ }).collect();
                 quote! {
                     let #coerce_ident: fn(#(#arg_tys),*) -> _ = |#params| #body;
+
+                    #[cfg(target_arch = "wasm32")]
+                    unsafe {
+                        core::arch::asm!(#asm_tag, in(local) #coerce_ident as usize,
+                            options(nostack, preserves_flags, readonly));
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
                     unsafe {
                         core::arch::asm!(#asm_tag, in(reg) #coerce_ident as usize,
                             options(nostack, preserves_flags, readonly));
@@ -129,6 +136,12 @@ fn inner(input: TokenStream) -> TokenStream {
                 }
             }
             Target::Function(expr) => quote! {
+                #[cfg(target_arch = "wasm32")]
+                unsafe {
+                    core::arch::asm!(#asm_tag, in(local) #expr as usize,
+                        options(nostack, preserves_flags, readonly));
+                }
+                #[cfg(not(target_arch = "wasm32"))]
                 unsafe {
                     core::arch::asm!(#asm_tag, in(reg) #expr as usize,
                         options(nostack, preserves_flags, readonly));

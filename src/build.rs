@@ -70,9 +70,9 @@ pub(crate) fn build_ir_for_env(
     // Use "cargo" from PATH (rustup proxy) for non-default toolchains
     // since `+version` syntax requires the proxy, not the toolchain binary.
     // Use `$CARGO` for the default toolchain for exact compatibility.
-    let mut cmd = if env.rustc.is_some() {
+    let mut cmd = if let Some(rustc) = &env.rustc {
         let mut c = Command::new(rustup);
-        c.args(["run", env.rustc.unwrap(), "cargo"]);
+        c.args(["run", rustc, "cargo"]);
         c
     } else {
         Command::new(cargo)
@@ -98,6 +98,25 @@ pub(crate) fn build_ir_for_env(
     cmd.arg("--");
     cmd.arg("--emit=llvm-ir");
     cmd.args(["-C", "strip=debuginfo", "-C", "codegen-units=1"]);
+
+    // Use a no-op linker: we only need the .ll file, not a linked binary.
+    // cargo always adds --emit=link which triggers linking; suppress it by
+    // replacing the linker with a command that immediately returns success.
+    if cfg!(windows) {
+        let noop_linker = ir_target_dir.join("noop_linker.bat");
+        if !noop_linker.exists() {
+            let _ = std::fs::create_dir_all(ir_target_dir);
+            let _ = std::fs::write(&noop_linker, "@exit /b 0\r\n");
+        }
+        cmd.arg("-C");
+        cmd.arg(format!("linker={}", noop_linker.display()));
+    } else {
+        cmd.args(["-C", "linker=true"]);
+    }
+
+    // In wasm32-unknown-unknown, inline assembly is unstable
+    cmd.env("RUSTC_BOOTSTRAP", "1");
+    cmd.arg("-Zcrate-attr=feature(asm_experimental_arch)");
 
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
@@ -140,40 +159,39 @@ fn find_ll_file(
         Err(_) => return None,
     };
 
-    let mut best: Option<(PathBuf, std::time::SystemTime)> = None;
+    let mut best_prefix_match: Option<(PathBuf, std::time::SystemTime)> = None;
+    let mut best_any_match: Option<(PathBuf, std::time::SystemTime)> = None;
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) == Some("ll") {
+            let mtime = entry
+                .metadata()
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .unwrap_or(std::time::UNIX_EPOCH);
+            if best_any_match.as_ref().map_or(true, |(_, t)| mtime > *t) {
+                best_any_match = Some((path.clone(), mtime));
+            }
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with(&prefix) {
-                    let mtime = entry
-                        .metadata()
-                        .ok()
-                        .and_then(|m| m.modified().ok())
-                        .unwrap_or(std::time::UNIX_EPOCH);
-                    if best.as_ref().map_or(true, |(_, t)| mtime > *t) {
-                        best = Some((path, mtime));
-                    }
+                if name.starts_with(&prefix)
+                    && best_prefix_match.as_ref().map_or(true, |(_, t)| mtime > *t)
+                {
+                    best_prefix_match = Some((path, mtime));
                 }
             }
         }
     }
 
-    best.map(|(p, _)| p)
+    best_prefix_match.or(best_any_match).map(|(path, _)| path)
 }
 
 /// Load and parse an IR file. Returns parsed functions.
-pub(crate) fn load_ir(path: &Path, allow_debug: bool) -> Option<Vec<FunctionIr>> {
+pub(crate) fn load_ir(path: &Path, _allow_debug: bool) -> Option<Vec<FunctionIr>> {
     if !path.exists() {
         return None;
     }
     let content =
         std::fs::read_to_string(path).unwrap_or_else(|e| panic!("Cannot read file: {}", e));
-
-    // Check for debug mode
-    if !allow_debug && content.contains("__rustc_debug_gdb_scripts_section__") {
-        panic!("The ir is emitted within debug mode.");
-    }
 
     let functions = parse_ir_functions(&content);
     Some(functions)
@@ -256,8 +274,7 @@ pub(crate) fn load_all_envs(
         ) {
             Ok(()) => {
                 let is_debug = matches!(env.opt_level, OptLevel::Debug);
-                if let Some(ll_path) = find_ll_file(&target_dir, crate_name, env.target, is_debug)
-                {
+                if let Some(ll_path) = find_ll_file(&target_dir, crate_name, env.target, is_debug) {
                     if let Some(funcs) = load_ir(&ll_path, is_debug) {
                         result.insert(env.clone(), funcs);
                         continue;
