@@ -1,5 +1,9 @@
 # ir-assert [![Latest Version]][crates.io] [![Documentation]][docs.rs] [![GitHub Actions]][actions]
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/yasuo-ozu/ir-assert/refs/heads/main/logo.png" alt="cargo-macra logo" width="320" />
+</p>
+
 [Latest Version]: https://img.shields.io/crates/v/ir-assert.svg
 [crates.io]: https://crates.io/crates/ir-assert
 [Documentation]: https://img.shields.io/docsrs/ir-assert
@@ -32,21 +36,11 @@ fn add<T: std::ops::Add<Output = T>>(a: T, b: T) -> T {
 #[test]
 fn test_add_is_single_block_no_calls() {
     assert_ir!(
-        basic_blocks.len().eq(1) & calls.len().eq(0),
-        add::<i32>
-    );
-}
-```
-
-You can assert on closures and multiple targets:
-
-```rust
-#[test]
-fn test_multiple_targets() {
-    assert_ir!(
-        basic_blocks.len().eq(1) & calls.len().eq(0),
+        !no_panic & basic_blocks.len().eq(1) & calls.len().eq(0),
+        // function example
+        add::<i32>,
+        // closure example
         |a: usize, b: usize| a + b,
-        add::<u64>
     );
 }
 ```
@@ -131,6 +125,7 @@ fn test_version_specific() {
 | `opt0`..`opt3`   | Shorthand for `opt_level("0")`..`opt_level("3")` |
 | `opt_s`, `opt_z` | Shorthand for `opt_level("s")`, `opt_level("z")` |
 
+
 Common zero-arg target helpers:
 
 - `target_wasm32_unknown_unknown`
@@ -140,6 +135,28 @@ Common zero-arg target helpers:
 - `target_aarch64_unknown_linux_gnu`
 - `target_x86_64_pc_windows_msvc`
 - `target_aarch64_pc_windows_msvc`
+
+## How to develop
+
+This repository uses Rust `1.71` as MSRV, and tests environment predicates with additional toolchains.
+
+Install required toolchains:
+
+```bash
+rustup toolchain install 1.80 1.90
+```
+
+Install required targets:
+
+```bash
+rustup target add wasm32-unknown-unknown x86_64-unknown-linux-gnu
+```
+
+Then run:
+
+```bash
+cargo test --workspace --all-features
+```
 
 ## How it works
 

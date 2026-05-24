@@ -48,22 +48,51 @@ mod dsl;
 mod no_panic;
 
 // Re-export DSL entry points for `use crate::predicate::*`.
+/// Predicate that matches debug-mode IR builds.
+///
+/// Useful for writing conditional assertions such as:
+/// `debug | calls.len().eq(0)`.
 pub use debug::debug;
+/// Predicate that asserts panic-related functions are not reachable
+/// from the target function's call graph.
+///
+/// Example: `no_panic & calls.len().eq(0)`.
 pub use no_panic::no_panic;
 
 // --- DSL namespace constants ---
 
 #[allow(non_upper_case_globals)]
+/// Function-level/basic-block entry point.
+///
+/// Examples:
+/// - `basic_blocks.len().eq(1)`
+/// - `basic_blocks.at(0).calls().len().eq(0)`
+/// - `basic_blocks.all(|bb| bb.instructions.len().ge(1))`
 pub const basic_blocks: dsl::BasicBlocks = dsl::BasicBlocks;
 #[allow(non_upper_case_globals)]
+/// Function-level call-count property.
+///
+/// Example: `calls.len().eq(0)`.
 pub const calls: dsl::PropertyAccess = dsl::PropertyAccess(dsl::Property::CallsLen);
 #[allow(non_upper_case_globals)]
+/// Function-level instruction-count property.
+///
+/// Example: `instructions.len().le(10)`.
 pub const instructions: dsl::PropertyAccess = dsl::PropertyAccess(dsl::Property::InstructionsLen);
 #[allow(non_upper_case_globals)]
+/// Function-level alloca-count property.
+///
+/// Example: `allocas.len().eq(0)`.
 pub const allocas: dsl::PropertyAccess = dsl::PropertyAccess(dsl::Property::AllocasLen);
 #[allow(non_upper_case_globals)]
+/// Function-level branch/switch-count property.
+///
+/// Example: `branches.len().ge(1)`.
 pub const branches: dsl::PropertyAccess = dsl::PropertyAccess(dsl::Property::BranchesLen);
 #[allow(non_upper_case_globals)]
+/// Function-level phi-node-count property.
+///
+/// Example: `phi_nodes.len().eq(0)`.
 pub const phi_nodes: dsl::PropertyAccess = dsl::PropertyAccess(dsl::Property::PhiNodesLen);
 
 // --- Shared primitives ---
@@ -106,8 +135,10 @@ use crate::env::EnvSpec;
 /// Returns a predicate that selects a specific rustc toolchain version.
 /// When combined with IR predicates, the IR will be generated using that toolchain.
 ///
-/// ```ignore
-/// assert_ir!(rustc("1.86") & basic_blocks.len().eq(1), my_fn);
+/// ```
+/// # use ir_assert::assert_ir;
+/// # fn my_fn() {}
+/// assert_ir!(rustc("1.80") & basic_blocks.len().eq(1), my_fn);
 /// ```
 #[allow(non_snake_case)]
 pub const fn rustc(version: &'static str) -> EnvSpec {
@@ -117,7 +148,9 @@ pub const fn rustc(version: &'static str) -> EnvSpec {
 /// Returns a predicate that selects a specific target triple.
 /// When combined with IR predicates, the IR will be generated for that target.
 ///
-/// ```ignore
+/// ```
+/// # use ir_assert::assert_ir;
+/// # fn my_fn() {}
 /// assert_ir!(target("wasm32-unknown-unknown") & basic_blocks.len().eq(1), my_fn);
 /// ```
 pub const fn target(triple: &'static str) -> EnvSpec {
@@ -125,18 +158,25 @@ pub const fn target(triple: &'static str) -> EnvSpec {
 }
 
 #[allow(non_upper_case_globals)]
+/// Select the `wasm32-unknown-unknown` target environment.
 pub const target_wasm32_unknown_unknown: EnvSpec = target("wasm32-unknown-unknown");
 #[allow(non_upper_case_globals)]
+/// Select the `x86_64-unknown-linux-gnu` target environment.
 pub const target_x86_64_unknown_linux_gnu: EnvSpec = target("x86_64-unknown-linux-gnu");
 #[allow(non_upper_case_globals)]
+/// Select the `x86_64-apple-darwin` target environment.
 pub const target_x86_64_apple_darwin: EnvSpec = target("x86_64-apple-darwin");
 #[allow(non_upper_case_globals)]
+/// Select the `aarch64-apple-darwin` target environment.
 pub const target_aarch64_apple_darwin: EnvSpec = target("aarch64-apple-darwin");
 #[allow(non_upper_case_globals)]
+/// Select the `aarch64-unknown-linux-gnu` target environment.
 pub const target_aarch64_unknown_linux_gnu: EnvSpec = target("aarch64-unknown-linux-gnu");
 #[allow(non_upper_case_globals)]
+/// Select the `x86_64-pc-windows-msvc` target environment.
 pub const target_x86_64_pc_windows_msvc: EnvSpec = target("x86_64-pc-windows-msvc");
 #[allow(non_upper_case_globals)]
+/// Select the `aarch64-pc-windows-msvc` target environment.
 pub const target_aarch64_pc_windows_msvc: EnvSpec = target("aarch64-pc-windows-msvc");
 
 const fn opt_level(level: &'static str) -> EnvSpec {
@@ -144,14 +184,20 @@ const fn opt_level(level: &'static str) -> EnvSpec {
 }
 
 #[allow(non_upper_case_globals)]
+/// Select optimization level `0`.
 pub const opt0: EnvSpec = opt_level("0");
 #[allow(non_upper_case_globals)]
+/// Select optimization level `1`.
 pub const opt1: EnvSpec = opt_level("1");
 #[allow(non_upper_case_globals)]
+/// Select optimization level `2`.
 pub const opt2: EnvSpec = opt_level("2");
 #[allow(non_upper_case_globals)]
+/// Select optimization level `3`.
 pub const opt3: EnvSpec = opt_level("3");
 #[allow(non_upper_case_globals)]
+/// Select optimization level `s` (optimize for size).
 pub const opt_s: EnvSpec = opt_level("s");
 #[allow(non_upper_case_globals)]
+/// Select optimization level `z` (aggressively optimize for size).
 pub const opt_z: EnvSpec = opt_level("z");

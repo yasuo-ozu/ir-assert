@@ -1,4 +1,5 @@
 #![allow(clippy::test_attr_in_doctest)]
+#![doc = include_str!("../README.md")]
 
 mod build;
 pub mod env;
@@ -33,7 +34,7 @@ pub trait Predicate: Display {
 ///
 /// Use inside `#[test]` functions:
 ///
-/// ```rust,ignore
+/// ```rust
 /// use ir_assert::assert_ir;
 ///
 /// #[test]
