@@ -148,14 +148,14 @@ fn extract_call_target(line: &str) -> Option<String> {
     let at_pos = after_call.find('@')?;
     let after_at = &after_call[at_pos + 1..];
 
-    let name = if after_at.starts_with('"') {
+    let name = if let Some(stripped) = after_at.strip_prefix('"') {
         // Quoted name: @"some name"
-        let end = after_at[1..].find('"')?;
-        &after_at[1..1 + end]
+        let end = stripped.find('"')?;
+        &stripped[..end]
     } else {
         // Unquoted name: @function_name(...)
         let end = after_at
-            .find(|c: char| c == '(' || c == ' ' || c == ',' || c == ')')
+            .find(['(', ' ', ',', ')'])
             .unwrap_or(after_at.len());
         &after_at[..end]
     };
@@ -172,12 +172,9 @@ fn find_call_keyword(line: &str) -> Option<usize> {
             return Some(i);
         }
     }
-    for (i, _) in line.match_indices("invoke ") {
-        if i == 0 || !line.as_bytes()[i - 1].is_ascii_alphanumeric() {
-            return Some(i);
-        }
-    }
-    None
+    line.match_indices("invoke ")
+        .map(|(i, _)| i)
+        .find(|&i| i == 0 || !line.as_bytes()[i - 1].is_ascii_alphanumeric())
 }
 
 fn is_alloca_instruction(line: &str) -> bool {

@@ -42,7 +42,7 @@ pub(crate) static BUILD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// is handled by the proxy, not the toolchain-specific binary.
 fn check_toolchain_available(rustup: &str, version: &str) -> bool {
     Command::new(rustup)
-        .args(["run", &format!("{}", version), "cargo"])
+        .args(["run", version, "cargo"])
         .arg("--version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -72,7 +72,7 @@ pub(crate) fn build_ir_for_env(
     // Use `$CARGO` for the default toolchain for exact compatibility.
     let mut cmd = if env.rustc.is_some() {
         let mut c = Command::new(rustup);
-        c.args(["run", &format!("{}", env.rustc.unwrap()), "cargo"]);
+        c.args(["run", env.rustc.unwrap(), "cargo"]);
         c
     } else {
         Command::new(cargo)
@@ -204,16 +204,16 @@ pub(crate) fn find_referenced_functions(container: &FunctionIr) -> Vec<String> {
         for (i, _) in trimmed.match_indices('@') {
             let after_at = &trimmed[i + 1..];
             // Handle quoted names: @"..."
-            let name = if after_at.starts_with('"') {
-                if let Some(end) = after_at[1..].find('"') {
-                    &after_at[1..end + 1]
+            let name = if let Some(stripped) = after_at.strip_prefix('"') {
+                if let Some(end) = stripped.find('"') {
+                    &stripped[..end]
                 } else {
                     continue;
                 }
             } else {
                 // Unquoted: ends at ( or space or , or ) or end
                 let end = after_at
-                    .find(|c: char| c == '(' || c == ' ' || c == ',' || c == ')' || c == '\n')
+                    .find(['(', ' ', ',', ')', '\n'])
                     .unwrap_or(after_at.len());
                 &after_at[..end]
             };

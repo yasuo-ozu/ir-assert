@@ -1,5 +1,6 @@
 use super::combinators::{At, BlockPred, Cmp, Quantifier};
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy)]
 pub enum Property {
     BasicBlocksLen,
@@ -99,6 +100,12 @@ impl BlockRef {
             branches: BlockPropertyAccess(Property::BranchesLen),
             phi_nodes: BlockPropertyAccess(Property::PhiNodesLen),
         }
+    }
+}
+
+impl Default for BlockRef {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

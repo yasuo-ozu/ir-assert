@@ -1,3 +1,4 @@
+#![allow(clippy::test_attr_in_doctest)]
 //! Predicate DSL for [`assert_ir!`](crate::assert_ir).
 //!
 //! This module provides:

@@ -1,3 +1,5 @@
+#![allow(clippy::test_attr_in_doctest)]
+
 mod build;
 pub mod env;
 mod ir;
@@ -95,6 +97,7 @@ macro_rules! assert_ir {
 
 #[doc(hidden)]
 #[track_caller]
+#[allow(clippy::too_many_arguments)]
 pub fn __macro_internal(
     cargo: &str,
     rustup: &str,
