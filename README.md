@@ -8,7 +8,7 @@
 [crates.io]: https://crates.io/crates/ir-assert
 [Documentation]: https://img.shields.io/docsrs/ir-assert
 [docs.rs]: https://docs.rs/ir-assert/latest/ir_assert/
-[GitHub Actions]: https://github.com/yasuo-ozu/ir-assert/actions/workflows/rust.yml/badge.svg
+[GitHub Actions]: https://github.com/yasuo-ozu/ir-assert/actions/workflows/test.yml/badge.svg
 [actions]: https://github.com/yasuo-ozu/ir-assert/actions/workflows/test.yml
 
 IR-level assertions for Rust tests. Verify that your code compiles to expected LLVM IR properties (e.g., a function has a single basic block, no function calls, etc.) to confirm zero-cost abstractions.
@@ -46,6 +46,10 @@ fn test_add_is_single_block_no_calls() {
 ```
 
 ## Predicate DSL
+
+### Available predicates
+
+see [predicate](https://docs.rs/ir-assert/latest/ir_assert/predicate/index.html) module documentation.
 
 ### Function-level properties
 
