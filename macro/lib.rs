@@ -115,13 +115,29 @@ fn inner(input: TokenStream) -> TokenStream {
         .map(|t| match t {
             Target::Closure {
                 coerce_ident,
-                arity,
+                arity: _,
                 params,
                 body,
             } => {
-                let arg_tys: Vec<TokenStream> = (0..*arity).map(|_| quote! { _ }).collect();
+                // For the container function, un-annotated closure params need a concrete
+                // type so the container compiles in isolation. We use `usize` as the
+                // fallback; annotated params keep their original type via `_` inference.
+                let container_arg_tys: Vec<TokenStream> = params.iter().map(|p| {
+                    if matches!(p, Pat::Type(_)) {
+                        quote! { _ }
+                    } else {
+                        quote! { usize }
+                    }
+                }).collect();
+                let container_params: Vec<TokenStream> = params.iter().map(|p| {
+                    if matches!(p, Pat::Type(_)) {
+                        quote! { #p }
+                    } else {
+                        quote! { #p: usize }
+                    }
+                }).collect();
                 quote! {
-                    let #coerce_ident: fn(#(#arg_tys),*) -> _ = |#params| #body;
+                    let #coerce_ident: fn(#(#container_arg_tys),*) -> _ = |#(#container_params),*| #body;
 
                     #[cfg(target_arch = "wasm32")]
                     unsafe {
@@ -150,6 +166,31 @@ fn inner(input: TokenStream) -> TokenStream {
         })
         .collect();
 
+    // When there's exactly one target, return it from the block
+    let return_expr: Option<TokenStream> = if prepared.len() == 1 {
+        match &prepared[0] {
+            Target::Closure {
+                arity,
+                params,
+                body,
+                ..
+            } => {
+                let arg_tys: Vec<TokenStream> = (0..*arity).map(|_| quote! { _ }).collect();
+                Some(quote! {
+                    let __ir_assert_ret: fn(#(#arg_tys),*) -> _ = |#params| #body;
+                    __ir_assert_ret
+                })
+            }
+            Target::Function(expr) => Some(quote! { #expr }),
+        }
+    } else {
+        None
+    };
+
+    let return_tokens = return_expr
+        .map(|expr| quote! { #expr })
+        .unwrap_or_else(|| quote! {});
+
     quote! {
         {
             #[no_mangle]
@@ -170,6 +211,8 @@ fn inner(input: TokenStream) -> TokenStream {
                 #pred_str,
                 &[#(#target_str_lits),*],
             );
+
+            #return_tokens
         }
     }
 }
