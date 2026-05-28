@@ -6,7 +6,7 @@ authors = ["Yasuo Ozu <yasuo@ozu.email>"]
 edition = "2021"
 rust-version = "1.71"
 repository = "https://github.com/yasuo-ozu/ir-assert"
-keywords = ["macros", "zerocost", "debugging", "testing", "llvm", "llvm-ir"]
+keywords = ["macros", "debugging", "testing", "llvm", "llvm-ir"]
 categories = ["development-tools::debugging", "development-tools::testing"]
 license = "MIT"
 
