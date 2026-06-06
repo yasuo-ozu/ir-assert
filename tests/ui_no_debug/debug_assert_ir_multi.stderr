@@ -1,0 +1,5 @@
+error: debug_assert_ir! does not support multiple targets when debug_assertions is disabled
+  --> tests/ui_no_debug/debug_assert_ir_multi.rs:12:68
+   |
+12 |     debug_assert_ir!(basic_blocks.len().eq(1) & calls.len().eq(0), add, identity);
+   |                                                                    ^^^^^^^^^^^^^

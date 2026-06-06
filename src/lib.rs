@@ -14,6 +14,8 @@ use std::path::PathBuf;
 
 #[doc(hidden)]
 pub use ir_assert_macro::__assert_ir_impl;
+#[doc(hidden)]
+pub use ir_assert_macro::__debug_assert_ir_impl;
 
 /// Trait for all predicate types that can be evaluated against a function's IR.
 pub trait Predicate: Display {
@@ -97,6 +99,38 @@ macro_rules! assert_ir {
     };
 }
 
+/// Like [`assert_ir!`], but only performs the IR assertion when `cfg(debug_assertions)` is
+/// enabled (i.e. debug builds).
+///
+/// With `cfg(debug_assertions)` on, this delegates entirely to [`assert_ir!`] and supports
+/// any number of targets.
+///
+/// With `cfg(debug_assertions)` off, the predicate is skipped:
+/// - A single target expression is evaluated and returned as-is (passthru).
+/// - Multiple target expressions are a **compile error** — use [`assert_ir!`] directly if you
+///   need multi-target assertions in release mode.
+///
+/// # Examples
+///
+/// ```rust
+/// use ir_assert::debug_assert_ir;
+///
+/// fn add(a: u64, b: u64) -> u64 { a + b }
+///
+/// #[test]
+/// fn test_add_optimized_in_debug() {
+///     // In debug builds this checks IR; in release builds it's a no-op passthru.
+///     let f = debug_assert_ir!(basic_blocks.len().eq(1) & calls.len().eq(0), add);
+///     assert_eq!(f(1, 2), 3);
+/// }
+/// ```
+#[macro_export]
+macro_rules! debug_assert_ir {
+    ($($tt:tt)*) => {
+        $crate::__debug_assert_ir_impl!($crate, $($tt)*)
+    };
+}
+
 #[doc(hidden)]
 #[track_caller]
 #[allow(clippy::too_many_arguments)]
@@ -118,8 +152,14 @@ pub fn __macro_internal(
         .unwrap_or_else(|| PathBuf::from(manifest_dir).join("target"));
     let ir_target_dir = cargo_target_dir.join("ir-assert");
 
-    // Synchronize: only one thread builds the IR file at a time
-    let _lock = build::BUILD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    // Acquire the build lock, which also carries the per-process IR cache.
+    // Only one thread compiles at a time; already-built envs are served from the cache.
+    let mut cache = build::BUILD_LOCK
+        .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+
+    let ctx = build::BuildContext { cargo, rustup, manifest_dir, crate_name, is_test };
 
     // 1. Collect all environments from the predicate tree
     let mut envs = Vec::new();
@@ -129,16 +169,8 @@ pub fn __macro_internal(
     envs.sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
     envs.dedup();
 
-    // 2. Build IR for all environments
-    let all_env_functions = build::load_all_envs(
-        cargo,
-        rustup,
-        manifest_dir,
-        crate_name,
-        is_test,
-        &envs,
-        &ir_target_dir,
-    )
+    // 2. Build IR for all environments (cached: compiler is invoked at most once per env)
+    let all_env_functions = build::load_all_envs(&ctx, &envs, &ir_target_dir, &mut cache)
     .unwrap_or_else(|errors| {
         let mut msg = String::from("ir-assert: none of the environments are available\n");
         for (env, e) in &errors {

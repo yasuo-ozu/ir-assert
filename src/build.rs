@@ -34,8 +34,27 @@ fn env_target_dir(base: &Path, env: &EnvSpec) -> PathBuf {
     }
 }
 
-/// Ensures only one thread builds the IR file at a time.
-pub(crate) static BUILD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+/// Cache key: (manifest_dir, crate_name, is_test, env).
+type CacheKey = (String, String, bool, EnvSpec);
+
+type BuildCache = std::sync::Mutex<HashMap<CacheKey, Result<Vec<FunctionIr>, String>>>;
+
+/// Process-global IR cache.
+///
+/// The Mutex serialises concurrent builds (only one thread compiles at a time)
+/// and protects the cache.  When the result for an env is already present, the
+/// compiler is not re-invoked — even when a second `assert_ir!` call in the same
+/// test binary requests the same (crate, env) combination.
+pub(crate) static BUILD_LOCK: std::sync::OnceLock<BuildCache> = std::sync::OnceLock::new();
+
+/// Shared build parameters that are constant for one `assert_ir!` invocation.
+pub(crate) struct BuildContext<'a> {
+    pub cargo: &'a str,
+    pub rustup: &'a str,
+    pub manifest_dir: &'a str,
+    pub crate_name: &'a str,
+    pub is_test: bool,
+}
 
 /// Check if a rustc toolchain is available via cargo.
 /// Uses "cargo" from PATH (the rustup proxy) since `+version` syntax
@@ -53,16 +72,12 @@ fn check_toolchain_available(rustup: &str, version: &str) -> bool {
 
 /// Build IR for a specific environment using `cargo rustc`.
 pub(crate) fn build_ir_for_env(
-    cargo: &str,
-    rustup: &str,
-    manifest_dir: &str,
-    crate_name: &str,
-    is_test: bool,
+    ctx: &BuildContext<'_>,
     env: &EnvSpec,
     ir_target_dir: &Path,
 ) -> Result<(), String> {
     if let Some(version) = env.rustc {
-        if !check_toolchain_available(rustup, version) {
+        if !check_toolchain_available(ctx.rustup, version) {
             return Err(format!("toolchain {} is not available", version));
         }
     }
@@ -71,16 +86,16 @@ pub(crate) fn build_ir_for_env(
     // since `+version` syntax requires the proxy, not the toolchain binary.
     // Use `$CARGO` for the default toolchain for exact compatibility.
     let mut cmd = if let Some(rustc) = &env.rustc {
-        let mut c = Command::new(rustup);
+        let mut c = Command::new(ctx.rustup);
         c.args(["run", rustc, "cargo"]);
         c
     } else {
-        Command::new(cargo)
+        Command::new(ctx.cargo)
     };
     cmd.arg("rustc");
-    cmd.args(["--manifest-path", &format!("{}/Cargo.toml", manifest_dir)]);
-    if is_test {
-        cmd.args(["--test", crate_name]);
+    cmd.args(["--manifest-path", &format!("{}/Cargo.toml", ctx.manifest_dir)]);
+    if ctx.is_test {
+        cmd.args(["--test", ctx.crate_name]);
     } else {
         cmd.arg("--lib");
     }
@@ -113,6 +128,10 @@ pub(crate) fn build_ir_for_env(
     } else {
         cmd.args(["-C", "linker=true"]);
     }
+
+    // Signal to the proc-macro that this is an internal IR-generation invocation so that
+    // debug_assert_ir! with multiple targets does not abort during this sub-compilation.
+    cmd.env("IR_ASSERT_IR_GEN", "1");
 
     // In wasm32-unknown-unknown, inline assembly is unstable
     cmd.env("RUSTC_BOOTSTRAP", "1");
@@ -246,41 +265,43 @@ pub(crate) fn find_referenced_functions(container: &FunctionIr) -> Vec<String> {
     refs
 }
 
-/// Load IR for all environments and build a mapping from EnvSpec to functions list.
-/// Returns Ok with the mapping if at least one environment succeeded,
-/// or Err with all collected errors if every environment failed.
+/// Load IR for all environments, using `cache` to skip already-built envs.
+///
+/// Returns `Ok` with the per-env function map when every requested environment
+/// built successfully, or `Err` with per-env error strings otherwise.
 pub(crate) fn load_all_envs(
-    cargo: &str,
-    rustup: &str,
-    manifest_dir: &str,
-    crate_name: &str,
-    is_test: bool,
+    ctx: &BuildContext<'_>,
     envs: &[EnvSpec],
     ir_target_dir: &Path,
+    cache: &mut HashMap<CacheKey, Result<Vec<FunctionIr>, String>>,
 ) -> Result<HashMap<EnvSpec, Vec<FunctionIr>>, HashMap<EnvSpec, String>> {
     let mut result = HashMap::new();
     let mut errors = HashMap::new();
 
     for env in envs {
-        let target_dir = env_target_dir(ir_target_dir, env);
-        match build_ir_for_env(
-            cargo,
-            rustup,
-            manifest_dir,
-            crate_name,
-            is_test,
-            env,
-            &target_dir,
-        ) {
-            Ok(()) => {
+        let key: CacheKey = (
+            ctx.manifest_dir.to_owned(),
+            ctx.crate_name.to_owned(),
+            ctx.is_test,
+            env.clone(),
+        );
+
+        // Build only if not already cached (hit or error).
+        if !cache.contains_key(&key) {
+            let target_dir = env_target_dir(ir_target_dir, env);
+            let entry = build_ir_for_env(ctx, env, &target_dir)
+            .and_then(|()| {
                 let is_debug = matches!(env.opt_level, OptLevel::Debug);
-                if let Some(ll_path) = find_ll_file(&target_dir, crate_name, env.target, is_debug) {
-                    if let Some(funcs) = load_ir(&ll_path, is_debug) {
-                        result.insert(env.clone(), funcs);
-                        continue;
-                    }
-                }
-                errors.insert(env.clone(), "IR file not found after build".to_string());
+                find_ll_file(&target_dir, ctx.crate_name, env.target, is_debug)
+                    .and_then(|ll_path| load_ir(&ll_path, is_debug))
+                    .ok_or_else(|| "IR file not found after build".to_string())
+            });
+            cache.insert(key.clone(), entry);
+        }
+
+        match cache[&key].clone() {
+            Ok(funcs) => {
+                result.insert(env.clone(), funcs);
             }
             Err(e) => {
                 errors.insert(env.clone(), e);
